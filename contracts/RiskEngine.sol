@@ -53,54 +53,54 @@ contract RiskEngine {
 
     /// @notice Decimals for computation (1 millitick (1/1000th of a basis point) precision: 1e-7 = 0.00001%).
     /// @dev uint type for composability with unsigned integer based mathematical operations.
-    uint256 internal constant DECIMALS = 10_000_000;
+    uint256 internal constant DECIMALS = 10_000_000; //e 精度，千分之一 
 
-    int16 internal constant MAX_UTILIZATION = 10_000;
-    uint256 internal constant LN2_SCALED = 6931472;
+    int16 internal constant MAX_UTILIZATION = 10_000; //e 最大资金利用率 100%
+    uint256 internal constant LN2_SCALED = 6931472; //e ln(2) 的缩放值
 
-    uint256 internal constant ONE_BPS = 1000;
-    uint256 internal constant TEN_BPS = 10000;
+    uint256 internal constant ONE_BPS = 1000; //e 1个基点 0.01%
+    uint256 internal constant TEN_BPS = 10000; // e 10个基点 0.1%
 
     //int256 constant EMA_PERIOD_SPOT = 120; // 2 minutes
     //int256 constant EMA_PERIOD_FAST = 240; // 4 minutes
     //int256 constant EMA_PERIOD_SLOW = 600; // 10 minutes
     //int256 constant EMA_PERIOD_EONS = 1800; // 30 minutes
-
+    //e 将四个 EMA 周期打包到一个 uint96 
     uint96 constant EMA_PERIODS = uint96(120 + (240 << 24) + (600 << 48) + (1800 << 72));
-    /// @notice The maximum allowed cumulative delta between the fast & slow oracle tick, the current & slow oracle tick, and the last-observed & slow oracle tick.
-    /// @dev Falls back on the more conservative (less solvent) tick during times of extreme volatility, where the price moves ~10% in <4 minutes.
+    /// @notice The maximum allowed cumulative delta between the fast & slow oracle tick, the current & slow oracle tick, and the last-observed & slow oracle tick. //e 快速/慢速预言机、当前/慢速预言机之间允许的最大 tick 差异
+    /// @dev Falls back on the more conservative (less solvent) tick during times of extreme volatility, where the price moves ~10% in <4 minutes. //e 约等于 10% 的价格波动，在极端波动时（<4分钟内价格移动~10%），系统会回退到更保守的 tick，防止操纵
     int256 internal constant MAX_TICKS_DELTA = 953;
 
     /// @notice The maximum allowed delta between the currentTick and the Uniswap TWAP tick during a liquidation (~5% down, ~5.26% up).
     /// @dev Mitigates manipulation of the currentTick that causes positions to be liquidated at a less favorable price.
-    uint16 internal constant MAX_TWAP_DELTA_LIQUIDATION = 513;
+    uint16 internal constant MAX_TWAP_DELTA_LIQUIDATION = 513; //e 清算时 currentTick 与 Uniswap TWAP tick 之间允许的最大偏差，约为 -5% 到 +5.26% 的价格范围，防止通过操纵 currentTick 来以不利价格清算头寸
 
     /// @notice The maximum allowed ratio for a single chunk, defined as `removedLiquidity / netLiquidity`.
     /// @dev The long premium spread multiplier that corresponds with the MAX_SPREAD value depends on VEGOID,
     /// which can be explored in this calculator: [https://www.desmos.com/calculator/mdeqob2m04](https://www.desmos.com/calculator/mdeqob2m04).
-    uint24 internal constant MAX_SPREAD = 90_000;
+    uint24 internal constant MAX_SPREAD = 90_000; //e 单个 chunk 的最大允许比率
 
     /// @notice Multiplier in basis points for the collateral requirement in the event of a buying power decrease, such as minting or force exercising another user.
     /// @dev must fit inside a uint26
-    uint32 internal constant BP_DECREASE_BUFFER = 13_333_333;
+    uint32 internal constant BP_DECREASE_BUFFER = 13_333_333; //e 当购买力下降时（如铸造或强制行权），抵押品要求的基点倍数
 
     /// @notice Decimals for WAD calculations.
     int256 internal constant WAD = 1e18;
 
     /// @notice Constant, in seconds, used to determine the max elapsed time between adaptive interest rate updates.
     /// @dev the time elapsed will be capped at IRM_MAX_ELAPSED_TIME
-    int256 public constant IRM_MAX_ELAPSED_TIME = 4096;
+    int256 public constant IRM_MAX_ELAPSED_TIME = 4096; //e 自适应利率更新之间的最大时间间隔（秒）
 
-    bytes32 internal constant BUILDER_SALT = keccak256("panoptic.builder");
+    bytes32 internal constant BUILDER_SALT = keccak256("panoptic.builder"); //CREATE2 部署的盐值，用于确定性地址生成
 
     /// @notice The maximum amount of change, in ticks, permitted between internal median updates.
-    int24 internal constant MAX_CLAMP_DELTA = 149;
+    int24 internal constant MAX_CLAMP_DELTA = 149; //e 内部中位数更新之间允许的最大 tick 变化
 
     /// @notice Parameter used to modify the [equation](https://www.desmos.com/calculator/mdeqob2m04) of the utilization-based multiplier for long premium.
-    // ν = 1/VEGOID = multiplicative factor for long premium (Eqns 1-5)
-    // Similar to vega in options because the liquidity utilization is somewhat reflective of the implied volatility (IV),
-    // and vegoid modifies the sensitivity of the streamia to changes in that utilization,
-    // much like vega measures the sensitivity of traditional option prices to IV.
+    // ν = 1/VEGOID = multiplicative factor for long premium (Eqns 1-5) //e ν = 1/VEGOID = 0.25，用于修改基于利用率的 long premium 倍数
+    // Similar to vega in options because the liquidity utilization is somewhat reflective of the implied volatility (IV), 类似期权中的 vega（衡量价格对隐含波动率的敏感度）
+    // and vegoid modifies the sensitivity of the streamia to changes in that utilization,控制 streamia（流动性费用）对利用率变化的敏感度
+    // much like vega measures the sensitivity of traditional option prices to IV. 值越小，对利用率变化越敏感
     // The effect of vegoid on the long premium multiplier can be explored here: https://www.desmos.com/calculator/mdeqob2m04
     uint8 internal constant VEGOID = 4;
 
@@ -240,7 +240,7 @@ contract RiskEngine {
     /// @dev Restores the pool to using only the automatically computed safe-mode level.
     /// @param pool The PanopticPool to unlock.
     function unlockPool(PanopticPool pool) external onlyGuardian {
-        emit GuardianSafeModeUpdated(true);
+        emit GuardianSafeModeUpdated(true); //q 解锁的时候应该是 false
         pool.unlockSafeMode();
     }
 
@@ -298,7 +298,7 @@ contract RiskEngine {
     /// @param ct0 The collateral tracker for currency0
     /// @param ct1 The collateral tracker for currency1
     /// @return The LeftRight-packed deltas for currency0/currency1 to move from the caller to the payor
-    function getRefundAmounts(
+    function getRefundAmounts( // q test 是否测试所有 token0/token1 的可能组合（见chatGPT）
         address payor,
         LeftRightSigned fees,
         int24 atTick,
